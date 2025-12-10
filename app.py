@@ -6,14 +6,28 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Database configuration
-DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME', 'fake_users_db'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'postgres'),
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432')
-}
+# Parse DATABASE_URL for Railway/Heroku compatibility
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Railway provides DATABASE_URL
+    from urllib.parse import urlparse
+    url = urlparse(DATABASE_URL)
+    DB_CONFIG = {
+        'dbname': url.path[1:],
+        'user': url.username,
+        'password': url.password,
+        'host': url.hostname,
+        'port': url.port or 5432
+    }
+else:
+    # Local development
+    DB_CONFIG = {
+        'dbname': os.getenv('DB_NAME', 'fake_users_db'),
+        'user': os.getenv('DB_USER', 'postgres'),
+        'password': os.getenv('DB_PASSWORD', 'postgres'),
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': os.getenv('DB_PORT', '5432')
+    }
 
 def get_db_connection():
     """Create database connection"""
@@ -100,4 +114,5 @@ def health():
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 if __name__ == '__main__':
+
     app.run(debug=True, host='0.0.0.0', port=5000)
