@@ -6,18 +6,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Database configuration
-DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME', 'fake_users_db'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'postgres'),
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432')
-}
-
 def get_db_connection():
-    """Create database connection"""
-    return psycopg2.connect(**DB_CONFIG)
+    """Create database connection using DATABASE_URL"""
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        cursor_factory=RealDictCursor
+    )
+    return conn
 
 def get_locales():
     """Fetch available locales from database"""
@@ -102,4 +97,5 @@ def health():
 if __name__ == '__main__':
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
