@@ -5,9 +5,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+
 def get_db_connection():
-    """Create database connection using psycopg3"""
-    conn = psycopg.connect(os.environ["DATABASE_URL"])
+    """Create database connection using psycopg3 with UTF-8 encoding"""
+    conn = psycopg.connect(
+        os.environ["DATABASE_URL"],
+        options="-c client_encoding=UTF8"
+    )
     return conn
 
 def get_locales():
@@ -97,6 +101,7 @@ def health():
 if __name__ == '__main__':
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
 
 
