@@ -1,37 +1,37 @@
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 
 app = Flask(__name__)
 
 def get_db_connection():
-    """Create database connection using DATABASE_URL"""
-    conn = psycopg2.connect(
-        os.environ["DATABASE_URL"],
-        cursor_factory=RealDictCursor
-    )
+    """Create database connection using psycopg3"""
+    conn = psycopg.connect(os.environ["DATABASE_URL"])
     return conn
 
 def get_locales():
     """Fetch available locales from database"""
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn.row_factory = psycopg.rows.dict_row
+    cur = conn.cursor()
     cur.execute("SELECT locale_code, locale_name FROM locales ORDER BY locale_code")
     locales = cur.fetchall()
     cur.close()
     conn.close()
     return locales
 
+
 def generate_users(locale, seed, batch_index, batch_size=10):
-    """Call stored procedure to generate fake users"""
+    """Call stored procedure to generate fake users (psycopg3)"""
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn.row_factory = psycopg.rows.dict_row
+    cur = conn.cursor()
     
-    cur.execute("""
-        SELECT * FROM generate_fake_users(%s, %s, %s, %s)
-    """, (locale, seed, batch_index, batch_size))
+    cur.execute(
+        "SELECT * FROM generate_fake_users(%s, %s, %s, %s)",
+        (locale, seed, batch_index, batch_size)
+    )
     
     users = cur.fetchall()
     cur.close()
@@ -97,5 +97,6 @@ def health():
 if __name__ == '__main__':
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
 
