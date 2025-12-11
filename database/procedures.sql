@@ -129,175 +129,170 @@ $$ LANGUAGE plpgsql STABLE;
 
 -- Generate full name
 CREATE OR REPLACE FUNCTION generate_name(
-    seed BIGINT,
+    seed INT,
     user_index INT,
-    locale VARCHAR(10)
-)
-RETURNS TABLE(
-    full_name TEXT,
-    gender CHAR(1)
-) AS $$
+    locale TEXT
+) RETURNS TEXT AS $$
 DECLARE
     first_name_text TEXT;
+    middle_name_text TEXT;
     last_name_text TEXT;
     title_text TEXT;
-    middle_initial TEXT;
-    use_title BOOLEAN;
-    use_middle BOOLEAN;
-    selected_gender CHAR(1);
-    first_id INT;
-    last_id INT;
-    title_id INT;
+    full_name TEXT;
+    selected_gender TEXT;
 BEGIN
-    -- Determine gender
-    IF prng_int(seed, user_index * 100, 0, 1) = 0 THEN
-        selected_gender := 'M';
-    ELSE
-        selected_gender := 'F';
-    END IF;
-    
-    -- Select first name
-    first_id := select_weighted_item(seed, user_index * 100 + 1, 'first_names', locale, selected_gender);
-    SELECT name INTO first_name_text FROM first_names WHERE id = first_id;
-    
-    -- Select last name
-    last_id := select_weighted_item(seed, user_index * 100 + 2, 'last_names', locale);
-    SELECT name INTO last_name_text FROM last_names WHERE id = last_id;
-    
-    -- Randomly decide on title (30% chance)
-    use_title := prng_int(seed, user_index * 100 + 3, 0, 99) < 30;
-    
-    -- Randomly decide on middle initial (40% chance)
-    use_middle := prng_int(seed, user_index * 100 + 4, 0, 99) < 40;
-    
+    -- Pick gender
+    selected_gender := CASE WHEN prng_int(seed, user_index * 100, 0, 1) = 0 THEN 'M' ELSE 'F' END;
+
+    -- First name
+    SELECT name INTO first_name_text
+    FROM first_names
+    WHERE id = select_weighted_item(seed, user_index * 100 + 1, 'first_names', locale, selected_gender);
+
+    -- Last name
+    SELECT name INTO last_name_text
+    FROM last_names
+    WHERE id = select_weighted_item(seed, user_index * 100 + 2, 'last_names', locale);
+
     full_name := first_name_text || ' ' || last_name_text;
-    
-    IF use_middle THEN
-        middle_initial := chr(65 + prng_int(seed, user_index * 100 + 5, 0, 25));
-        full_name := first_name_text || ' ' || middle_initial || '. ' || last_name_text;
+
+    -- Middle full name (20% chance)
+    IF prng_int(seed, user_index * 100 + 3, 0, 99) < 20 THEN
+        SELECT name INTO middle_name_text
+        FROM first_names
+        WHERE id = select_weighted_item(seed, user_index * 100 + 4, 'first_names', locale, selected_gender);
+        full_name := first_name_text || ' ' || middle_name_text || ' ' || last_name_text;
     END IF;
-    
-    IF use_title THEN
-        title_id := select_weighted_item(seed, user_index * 100 + 6, 'titles', locale, selected_gender);
-        SELECT title INTO title_text FROM titles WHERE id = title_id;
+
+    -- Title (15% chance)
+    IF prng_int(seed, user_index * 100 + 5, 0, 99) < 15 THEN
+        SELECT title INTO title_text
+        FROM titles
+        WHERE id = select_weighted_item(seed, user_index * 100 + 6, 'titles', locale, selected_gender);
         full_name := title_text || ' ' || full_name;
     END IF;
-    
-    RETURN QUERY SELECT full_name, selected_gender;
+
+    -- Suffix (10% chance)
+    IF prng_int(seed, user_index * 100 + 7, 0, 99) < 10 THEN
+        CASE prng_int(seed, user_index * 100 + 8, 0, 2)
+            WHEN 0 THEN full_name := full_name || ' Jr.';
+            WHEN 1 THEN full_name := full_name || ' Sr.';
+            ELSE full_name := full_name || ' III';
+        END CASE;
+    END IF;
+
+    -- Locale-specific ordering (Germany: sometimes Last, First)
+    IF locale = 'de_DE' AND prng_int(seed, user_index * 100 + 9, 0, 1) = 1 THEN
+        full_name := last_name_text || ', ' || first_name_text;
+    END IF;
+
+    RETURN full_name;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql;
 
 -- Generate address
 CREATE OR REPLACE FUNCTION generate_address(
-    seed BIGINT,
+    seed INT,
     user_index INT,
-    locale VARCHAR(10)
-)
-RETURNS TEXT AS $$
+    locale TEXT
+) RETURNS TEXT AS $$
 DECLARE
-    street_num INT;
     street_name_text TEXT;
     street_type_text TEXT;
     city_text TEXT;
-    state_text TEXT;
     postal_text TEXT;
-    postal_pattern TEXT;
     address_line TEXT;
-    city_id INT;
-    street_id INT;
-    type_id INT;
-    format_variant INT;
 BEGIN
-    -- Generate street number
-    street_num := prng_int(seed, user_index * 200, 1, 9999);
-    
-    -- Select street name
-    street_id := prng_int(seed, user_index * 200 + 1, 1, (SELECT COUNT(*) FROM street_names WHERE locale_code = locale)::INT);
-    SELECT name INTO street_name_text FROM street_names WHERE locale_code = locale OFFSET street_id - 1 LIMIT 1;
-    
-    -- Select street type
-    type_id := prng_int(seed, user_index * 200 + 2, 1, (SELECT COUNT(*) FROM street_types WHERE locale_code = locale)::INT);
-    SELECT type_name INTO street_type_text FROM street_types WHERE locale_code = locale OFFSET type_id - 1 LIMIT 1;
-    
-    -- Select city
-    city_id := prng_int(seed, user_index * 200 + 3, 1, (SELECT COUNT(*) FROM cities WHERE locale_code = locale)::INT);
-    SELECT city_name, state_province, postal_code_pattern 
-    INTO city_text, state_text, postal_pattern
-    FROM cities WHERE locale_code = locale OFFSET city_id - 1 LIMIT 1;
-    
-    -- Generate postal code based on pattern
-    postal_text := postal_pattern;
-    FOR i IN 1..length(postal_pattern) LOOP
-        IF substring(postal_pattern from i for 1) = '#' THEN
-            postal_text := overlay(postal_text placing 
-                prng_int(seed, user_index * 200 + 4 + i, 0, 9)::TEXT 
-                from i for 1);
-        END IF;
-    END LOOP;
-    
-    -- Format address based on locale
-    format_variant := prng_int(seed, user_index * 200 + 10, 0, 2);
-    
-    IF locale = 'en_US' THEN
-        IF format_variant = 0 THEN
-            address_line := street_num || ' ' || street_name_text || ' ' || street_type_text;
-        ELSIF format_variant = 1 THEN
-            address_line := 'Apt ' || prng_int(seed, user_index * 200 + 11, 1, 999)::TEXT || ', ' || 
-                          street_num || ' ' || street_name_text || ' ' || street_type_text;
-        ELSE
-            address_line := 'Suite ' || prng_int(seed, user_index * 200 + 11, 100, 999)::TEXT || ', ' || 
-                          street_num || ' ' || street_name_text || ' ' || street_type_text;
-        END IF;
-        RETURN address_line || ', ' || city_text || ', ' || state_text || ' ' || postal_text;
-    ELSE  -- de_DE
-        address_line := street_name_text || street_type_text || ' ' || street_num;
-        IF format_variant > 0 THEN
-            address_line := address_line || ', Wohnung ' || prng_int(seed, user_index * 200 + 11, 1, 99)::TEXT;
-        END IF;
-        RETURN address_line || ', ' || postal_text || ' ' || city_text;
+    -- Weighted street name/type
+    SELECT name INTO street_name_text
+    FROM street_names
+    WHERE id = select_weighted_item(seed, user_index * 200 + 1, 'street_names', locale);
+
+    SELECT type_name INTO street_type_text
+    FROM street_types
+    WHERE id = select_weighted_item(seed, user_index * 200 + 2, 'street_types', locale);
+
+    -- Street number
+    address_line := prng_int(seed, user_index * 200 + 3, 1, 9999)::TEXT;
+
+    -- Locale-specific ordering
+    IF locale = 'de_DE' THEN
+        address_line := street_name_text || ' ' || street_type_text || ' ' || address_line;
+    ELSE
+        address_line := address_line || ' ' || street_name_text || ' ' || street_type_text;
     END IF;
+
+    -- Apartment/Suite/Wohnung (30% chance)
+    IF prng_int(seed, user_index * 200 + 4, 0, 99) < 30 THEN
+        CASE locale
+            WHEN 'de_DE' THEN
+                address_line := address_line || ', Wohnung ' || prng_int(seed, user_index * 200 + 5, 1, 200)::TEXT;
+            ELSE
+                address_line := address_line || ', Apt ' || prng_int(seed, user_index * 200 + 5, 1, 200)::TEXT;
+        END CASE;
+    END IF;
+
+    -- Building/Block (20% chance)
+    IF prng_int(seed, user_index * 200 + 6, 0, 99) < 20 THEN
+        address_line := address_line || ', Building ' || prng_int(seed, user_index * 200 + 7, 1, 50)::TEXT;
+    END IF;
+
+    -- City
+    SELECT name INTO city_text
+    FROM cities
+    WHERE id = select_weighted_item(seed, user_index * 200 + 8, 'cities', locale);
+
+    -- Postal code
+    SELECT pattern INTO postal_text
+    FROM postal_codes
+    WHERE id = select_weighted_item(seed, user_index * 200 + 9, 'postal_codes', locale);
+
+    postal_text := regexp_replace(postal_text, 'N', prng_int(seed, user_index * 200 + 10, 0, 9)::TEXT, 'g');
+
+    -- US ZIP+4 variation
+    IF locale = 'en_US' AND prng_int(seed, user_index * 200 + 11, 0, 99) < 15 THEN
+        postal_text := postal_text || '-' || lpad(prng_int(seed, user_index * 200 + 12, 0, 9999)::TEXT, 4, '0');
+    END IF;
+
+    RETURN address_line || ', ' || city_text || ', ' || postal_text;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql;
 
 -- Generate phone number
 CREATE OR REPLACE FUNCTION generate_phone(
-    seed BIGINT,
+    seed INT,
     user_index INT,
-    locale VARCHAR(10)
-)
-RETURNS TEXT AS $$
+    locale TEXT
+) RETURNS TEXT AS $$
 DECLARE
-    format_variant INT;
-    area_code TEXT;
-    prefix TEXT;
-    line_num TEXT;
+    format_text TEXT;
+    phone_number TEXT;
 BEGIN
-    format_variant := prng_int(seed, user_index * 300, 0, 3);
-    
-    IF locale = 'en_US' THEN
-        area_code := prng_int(seed, user_index * 300 + 1, 200, 999)::TEXT;
-        prefix := prng_int(seed, user_index * 300 + 2, 200, 999)::TEXT;
-        line_num := lpad(prng_int(seed, user_index * 300 + 3, 0, 9999)::TEXT, 4, '0');
-        
-        CASE format_variant
-            WHEN 0 THEN RETURN '(' || area_code || ') ' || prefix || '-' || line_num;
-            WHEN 1 THEN RETURN area_code || '-' || prefix || '-' || line_num;
-            WHEN 2 THEN RETURN area_code || '.' || prefix || '.' || line_num;
-            ELSE RETURN '+1' || area_code || prefix || line_num;
-        END CASE;
-    ELSE  -- de_DE
-        area_code := lpad(prng_int(seed, user_index * 300 + 1, 200, 9999)::TEXT, 4, '0');
-        prefix := lpad(prng_int(seed, user_index * 300 + 2, 100, 999999)::TEXT, 6, '0');
-        
-        CASE format_variant
-            WHEN 0 THEN RETURN '0' || area_code || ' ' || prefix;
-            WHEN 1 THEN RETURN '0' || area_code || '-' || prefix;
-            WHEN 2 THEN RETURN '0' || area_code || '/' || prefix;
-            ELSE RETURN '+49 ' || area_code || ' ' || prefix;
+    -- Weighted format selection
+    SELECT format_pattern INTO format_text
+    FROM phone_formats
+    WHERE id = select_weighted_item(seed, user_index * 300, 'phone_formats', locale);
+
+    -- Replace placeholders
+    phone_number := format_text;
+    phone_number := regexp_replace(phone_number, 'N', prng_int(seed, user_index * 300 + 1, 0, 9)::TEXT, 'g');
+
+    -- Optional country code (20% chance)
+    IF prng_int(seed, user_index * 300 + 2, 0, 99) < 20 THEN
+        CASE locale
+            WHEN 'de_DE' THEN phone_number := '+49 ' || phone_number;
+            ELSE phone_number := '+1 ' || phone_number;
         END CASE;
     END IF;
+
+    -- Optional extension (10% chance)
+    IF prng_int(seed, user_index * 300 + 3, 0, 99) < 10 THEN
+        phone_number := phone_number || ' x' || prng_int(seed, user_index * 300 + 4, 100, 9999)::TEXT;
+    END IF;
+
+    RETURN phone_number;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql;
 
 -- Generate email
 CREATE OR REPLACE FUNCTION generate_email(
@@ -434,4 +429,5 @@ BEGIN
             );
     END LOOP;
 END;
+
 $$ LANGUAGE plpgsql STABLE;
