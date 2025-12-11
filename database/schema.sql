@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS eye_colors (
     frequency INTEGER DEFAULT 1
 );
 
+-- Phone Formats table
+CREATE TABLE phone_formats (
+    id SERIAL PRIMARY KEY,
+    format_pattern TEXT NOT NULL,
+    locale_code TEXT NOT NULL,
+    frequency INT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS email_domains (
     id SERIAL PRIMARY KEY,
     domain VARCHAR(100) NOT NULL,
@@ -72,3 +80,4 @@ CREATE INDEX idx_street_types_locale ON street_types(locale_code);
 CREATE INDEX idx_cities_locale ON cities(locale_code);
 CREATE INDEX idx_eye_colors_locale ON eye_colors(locale_code);
 CREATE INDEX idx_email_domains_locale ON email_domains(locale_code);
+CREATE INDEX idx_phone_formats_locale ON phone_formats(locale_code);
