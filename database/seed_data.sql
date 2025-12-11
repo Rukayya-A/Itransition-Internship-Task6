@@ -243,14 +243,31 @@ INSERT INTO street_names (name, locale_code) VALUES
 ('Johannes', 'de_DE'), ('Sebastian', 'de_DE'), ('Theodor', 'de_DE'), ('Albrecht', 'de_DE'), ('Ernst', 'de_DE');
 
 -- Street Types
-INSERT INTO street_types (type_name, locale_code, position) VALUES
-('Street', 'en_US', 'suffix'), ('Avenue', 'en_US', 'suffix'), ('Road', 'en_US', 'suffix'),
-('Drive', 'en_US', 'suffix'), ('Lane', 'en_US', 'suffix'), ('Way', 'en_US', 'suffix'),
-('Court', 'en_US', 'suffix'), ('Circle', 'en_US', 'suffix'), ('Boulevard', 'en_US', 'suffix'),
-('Place', 'en_US', 'suffix'), ('Terrace', 'en_US', 'suffix'), ('Trail', 'en_US', 'suffix'),
-('straße', 'de_DE', 'suffix'), ('weg', 'de_DE', 'suffix'), ('gasse', 'de_DE', 'suffix'),
-('platz', 'de_DE', 'suffix'), ('allee', 'de_DE', 'suffix'), ('ring', 'de_DE', 'suffix'),
-('damm', 'de_DE', 'suffix'), ('ufer', 'de_DE', 'suffix'), ('pfad', 'de_DE', 'suffix');
+-- Street Types with frequency for weighted selection
+INSERT INTO street_types (type_name, locale_code, position, frequency) VALUES
+('Street', 'en_US', 'suffix', 40),
+('Avenue', 'en_US', 'suffix', 30),
+('Road', 'en_US', 'suffix', 20),
+('Drive', 'en_US', 'suffix', 15),
+('Lane', 'en_US', 'suffix', 10),
+('Way', 'en_US', 'suffix', 10),
+('Court', 'en_US', 'suffix', 5),
+('Circle', 'en_US', 'suffix', 5),
+('Boulevard', 'en_US', 'suffix', 8),
+('Place', 'en_US', 'suffix', 5),
+('Terrace', 'en_US', 'suffix', 5),
+('Trail', 'en_US', 'suffix', 3),
+
+('Straße', 'de_DE', 'suffix', 50),
+('Weg', 'de_DE', 'suffix', 20),
+('Gasse', 'de_DE', 'suffix', 15),
+('Platz', 'de_DE', 'suffix', 15),
+('Allee', 'de_DE', 'suffix', 10),
+('Ring', 'de_DE', 'suffix', 8),
+('Damm', 'de_DE', 'suffix', 5),
+('Ufer', 'de_DE', 'suffix', 5),
+('Pfad', 'de_DE', 'suffix', 3);
+
 
 -- Cities with postal patterns (en_US)
 INSERT INTO cities (city_name, locale_code, state_province, postal_code_pattern) VALUES
@@ -305,6 +322,18 @@ INSERT INTO eye_colors (color_name, locale_code, frequency) VALUES
 ('Braun', 'de_DE', 10), ('Blau', 'de_DE', 8), ('Grün', 'de_DE', 6),
 ('Grau', 'de_DE', 4), ('Bernstein', 'de_DE', 1), ('Haselnuss', 'de_DE', 2);
 
+-- Phone Formats seed data
+INSERT INTO phone_formats (format_pattern, locale_code, frequency) VALUES
+('(NNN) NNN-NNNN', 'en_US', 40),
+('NNN-NNN-NNNN', 'en_US', 30),
+('NNN.NNN.NNNN', 'en_US', 20),
+('+1 NNNNNNNNNN', 'en_US', 10),
+
+('0NNNN NNNNN', 'de_DE', 40),
+('0NNNN-NNNNN', 'de_DE', 30),
+('0NNNN/NNNNN', 'de_DE', 20),
+('+49 NNNN NNNNN', 'de_DE', 10);
+
 -- Email Domains
 INSERT INTO email_domains (domain, locale_code) VALUES
 ('gmail.com', 'en_US'), ('yahoo.com', 'en_US'), ('outlook.com', 'en_US'),
@@ -312,4 +341,5 @@ INSERT INTO email_domains (domain, locale_code) VALUES
 ('protonmail.com', 'en_US'), ('mail.com', 'en_US'), ('zoho.com', 'en_US'),
 ('gmx.de', 'de_DE'), ('web.de', 'de_DE'), ('t-online.de', 'de_DE'),
 ('freenet.de', 'de_DE'), ('gmx.net', 'de_DE'), ('yahoo.de', 'de_DE'),
+
 ('outlook.de', 'de_DE'), ('posteo.de', 'de_DE'), ('mailbox.org', 'de_DE');
