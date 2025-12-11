@@ -379,8 +379,8 @@ $$ LANGUAGE plpgsql STABLE;
 CREATE OR REPLACE FUNCTION generate_fake_users(
     p_locale VARCHAR(10),
     p_seed BIGINT,
-    p_batch_index INT,
-    p_batch_size INT DEFAULT 10
+    p_batch_index BIGINT,
+    p_batch_size BIGINT DEFAULT 10
 )
 RETURNS TABLE(
     batch_position INT,
@@ -395,8 +395,8 @@ RETURNS TABLE(
     email TEXT
 ) AS $$
 DECLARE
-    i INT;
-    global_index INT;
+    i BIGINT;
+    global_index BIGINT;
     name_rec RECORD;
     phys_rec RECORD;
     coords_rec RECORD;
@@ -404,17 +404,12 @@ BEGIN
     FOR i IN 0..p_batch_size - 1 LOOP
         global_index := p_batch_index * p_batch_size + i;
         
-        -- Generate name and get gender
         SELECT * INTO name_rec FROM generate_name(p_seed, global_index, p_locale);
-        
-        -- Generate coordinates
         SELECT * INTO coords_rec FROM prng_sphere_coords(p_seed, global_index * 600);
-        
-        -- Generate physical attributes
         SELECT * INTO phys_rec FROM generate_physical_attributes(p_seed, global_index, p_locale, name_rec.gender);
         
         RETURN QUERY SELECT
-            i,
+            i::INT,
             name_rec.full_name,
             generate_address(p_seed, global_index, p_locale),
             coords_rec.latitude,
@@ -429,5 +424,4 @@ BEGIN
             );
     END LOOP;
 END;
-
 $$ LANGUAGE plpgsql STABLE;
