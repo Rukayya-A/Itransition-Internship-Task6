@@ -51,24 +51,24 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Uniform distribution on sphere (lat/lon)
-CREATE OR REPLACE FUNCTION prng_sphere_coords(seed BIGINT, pos INT)
-RETURNS TABLE(latitude FLOAT, longitude FLOAT) AS $$
+CREATE OR REPLACE FUNCTION prng_sphere_coords(seed BIGINT, n BIGINT)
+RETURNS TABLE(lat DOUBLE PRECISION, lon DOUBLE PRECISION) AS $$
 DECLARE
-    u FLOAT;
-    v FLOAT;
-    lat FLOAT;
-    lon FLOAT;
+    u DOUBLE PRECISION;
+    v DOUBLE PRECISION;
 BEGIN
-    u := prng_float(seed, pos * 2);
-    v := prng_float(seed, pos * 2 + 1);
-    
-    -- Uniform on sphere: latitude uses arcsin of uniform distribution
-    lat := degrees(asin(2.0 * u - 1.0));
-    lon := 360.0 * v - 180.0;
-    
-    RETURN QUERY SELECT lat, lon;
+    -- Generate two uniform randoms using your PRNG
+    u := (prng_float(seed, n));
+    v := (prng_float(seed, n + 1));
+
+    -- Latitude: asin(2u - 1), Longitude: 2πv - π
+    lat := asin(2 * u - 1);
+    lon := 2 * pi() * v - pi();
+
+    RETURN NEXT;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+
 
 -- Weighted selection from lookup table
 CREATE OR REPLACE FUNCTION select_weighted_item(
@@ -425,3 +425,4 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql STABLE;
+
